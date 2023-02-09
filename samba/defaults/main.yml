@@ -1,0 +1,54 @@
+---
+# Настройки роли, что будет сделано при запуске роли
+# Подготовка
+need_preparing              : false
+# Установка
+need_install                : true
+# Создание нового домена AD
+need_init_ad                : false
+# Присоединение к существующему домену AD в роли КД
+need_join_domain            : false
+# Настройка синхронизации времени
+neet_set_time               : false
+# Настройка политик паролей
+need_pass_set               : false
+# Тестирование
+need_testing                : false
+# Тестирование после присоединения к домену AD в роли КД
+need_testing_after_join     : false
+# Репликация
+need_replication            : false
+
+# Разные параметры
+# Имя хоста, можно поменять перед инициализацией
+new_dc_hostname             : "{{ ansible_hostname }}"
+# ДНС сервер, можно задать свой, по дефолту стоит default gateway
+default_ns                  : "{{ ansible_default_ipv4.gateway }}"
+# Имя домена NetBIOS (рабочая группа)
+domain                      : TEST
+# Название твоего домена
+ad_domain                   : TEST.DOMAIN.LOCAL
+# ДНС бэкэнд BIND9_DLZ либо SAMBA_INTERNAL
+dns_backend                 : SAMBA_INTERNAL
+# Пароль администратора домена(либо спрятать в voult либо сменить после создания домена)
+admin_dc_pass               : Password1
+# SAMBA на виртуальной машине, нужно для настройки ntp
+on_vm                       : true
+# Обратная зона днс
+revers_zone                 : 2.0.10
+# Контроллер домена с ролью FSMO PDC_Emulator
+pdc_emulator                : tdc1
+# пароль rsync для репликации sysvol(спрятать?)
+rsync_replication_pass      : 12ewqw23nbHhnn
+# полное название домена для ручной репликации
+domain_for_rep              : dc=test,dc=domain,dc=local
+
+# Настройка групповых политик паролей(не работает через виндовую остнастку)
+# значения могут быть on|off|default
+complexity                  : "off" # Пароль должен отвечать требованиям сложности
+store_plaintext             : "off" # Хранить пароли используя обратимое шифрование
+# значения равны числу
+history_length              : 0 # Число хранимых предыдущих паролей пользователей(Требовать неповторяемость паролей)
+min_pwd_length              : 0 # Минимальное количество символов в пароле
+min_pwd_age                 : 0 # Минимальный срок действия пароля
+max_pwd_age                 : 0 # Максимальный срок действия пароля

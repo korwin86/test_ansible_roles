@@ -1,0 +1,49 @@
+---
+
+- name: Подготовка к установке | Изменить имя сервера
+  ansible.builtin.hostname:
+   name: "{{new_dc_hostname }}"
+
+- name: Подготовка к установке | Отключить systemd-resolved
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    enabled: false
+    state: stopped
+
+- name: Подготовка к установке | Настроить /etc/resolv.conf
+  ansible.builtin.template:
+   src: resolv.j2
+   dest: "/etc/resolv.conf"
+   mode: 0644
+   backup: true
+
+- name: Подготовка к установке | Настроить /etc/hosts
+  ansible.builtin.template:
+   src: hosts.j2
+   dest: "/etc/hosts"
+   mode: 0644
+   backup: true
+
+- name: Подготовка к установке | Поиск конфига netplan
+  ansible.builtin.find:
+   paths: "/etc/netplan"
+   patterns: "*.yaml"
+  register: netplan_check_config
+
+- name: Подготовка к установке | Чтение конфига netplan
+  ansible.builtin.command: cat {{ netplan_check_config.files[0].path }}
+  register: netplan_file_cat
+  changed_when: netplan_file_cat.rc != 0
+
+- name: Подготовка к установке | Создание конфига netplan если настроен dhcp, включаем статически ip с текущими настройками.
+  ansible.builtin.template:
+   src: netplan_config.j2
+   dest: "{{ netplan_check_config.files[0].path }}"
+   mode: 0644
+   backup: true
+  when: netplan_file_cat.stdout.find('addresses') != -1
+
+- name: Подготовка к установке | Netplan apply config
+  ansible.builtin.command: netplan apply
+  register: netplan_apply_var
+  changed_when: netplan_apply_var.rc != 0

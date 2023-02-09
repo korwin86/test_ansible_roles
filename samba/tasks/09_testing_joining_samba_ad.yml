@@ -1,0 +1,31 @@
+---
+
+- name: Тестирование Samba AD DC после присоединения | Отображение статусов репликации на контроллере домена Samba
+  ansible.builtin.command: samba-tool drs showrepl
+  register: rep_st
+  ignore_errors: true
+  changed_when: rep_st.rc != 0
+
+- name: Тестирование Samba AD DC после присоединения | Результат репликации на контроллере домена Samba
+  ansible.builtin.debug:
+    msg: "{{ rep_st.stdout_lines }}"
+
+- name: Тестирование Samba AD DC после присоединения | Тестирования репликации LDAP между контроллерами домена
+  ansible.builtin.command: samba-tool ldapcmp ldap://{{ pdc_emulator }} ldap://{{ new_dc_hostname }} -Uadministrator%{{ admin_dc_pass }}
+  register: ldap_test
+  ignore_errors: true
+  changed_when: ldap_test.rc != 0
+
+- name: Тестирование Samba AD DC после присоединения | Результат тестирования репликации LDAP между контроллерами домена
+  ansible.builtin.debug:
+    msg: "{{ ldap_test.stdout_lines }}"
+
+- name: Тестирование Samba AD DC после присоединения | Тестирование базы данных Samba AD
+  ansible.builtin.command: samba-tool dbcheck --cross-ncs
+  register: db_check_info
+  ignore_errors: true
+  changed_when: db_check_info.rc != 0
+
+- name: Тестирование Samba AD DC после присоединения | Результат тестирования базы данных Samba AD
+  ansible.builtin.debug:
+    msg: "{{ db_check_info.stdout_lines }}"

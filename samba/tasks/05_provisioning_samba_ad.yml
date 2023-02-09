@@ -1,0 +1,22 @@
+---
+
+- name: Инициализация Samba Active Directory | Инициализация Samba AD в неинтерактивном режиме
+  ansible.builtin.command: samba-tool domain provision --server-role=dc --use-rfc2307 --dns-backend={{ dns_backend }} --realm={{ ad_domain }} --domain={{ domain }} --adminpass={{ admin_dc_pass }}
+  register: ad_result
+  changed_when: ad_result.rc != 0
+
+- name: Инициализация Samba Active Directory | Результат нициализации Samba AD
+  ansible.builtin.debug:
+   msg: "{{ ad_result.stderr_lines }}"
+
+- name: Инициализация Samba Active Directory | Замена dns forwarder в smb.conf
+  ansible.builtin.lineinfile:
+    path: "/etc/samba/smb.conf"
+    regexp: "^ *dns forwarder"
+    line: "        dns forwarder = {{ ansible_default_ipv4.address }}"
+
+- name: Инициализация Samba Active Directory | Копирование файла конфигурации Kerberos
+  ansible.builtin.copy:
+   remote_src: true
+   src: "/var/lib/samba/private/krb5.conf"
+   dest: "/etc/krb5.conf"

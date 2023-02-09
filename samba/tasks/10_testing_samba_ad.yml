@@ -1,0 +1,69 @@
+---
+
+- name: Тестирование Samba AD DC  | Проверка sysvol netlogon на контроллере домена
+  ansible.builtin.command: smbclient -L localhost -N
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Результат проверки sysvol netlogon на контроллере домена
+  ansible.builtin.debug:
+   msg: "{{ testing_var.stdout_lines }}"
+
+- name: Тестирование Samba AD DC  | Проверка аунтификации netlogon с учеткой админа
+  ansible.builtin.command: smbclient //localhost/netlogon --user=Administrator%{{ admin_dc_pass }} -c 'ls'
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Результат проверки аунтификации netlogon с учеткой админа
+  ansible.builtin.debug:
+   msg: "{{ testing_var.stdout_lines }}"
+
+- name: Тестирование Samba AD DC  | Проверка _ldap записи в днс
+  ansible.builtin.command: host -t SRV _ldap._tcp.{{ ad_domain }}.
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Результат проверки _ldap записи в днс
+  ansible.builtin.debug:
+   msg: "{{ testing_var.stdout_lines }}"
+
+- name: Тестирование Samba AD DC  | Проверка _kerberos записи в днс
+  ansible.builtin.command: host -t SRV _kerberos._udp.{{ ad_domain }}.
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Результат проверки _kerberos записи в днс
+  ansible.builtin.debug:
+   msg: "{{ testing_var.stdout_lines }}"
+
+- name: Тестирование Samba AD DC  | Проверка A записи контроллера домена в днс
+  ansible.builtin.command: host -t A {{ ansible_hostname }}.{{ ad_domain }}.
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Результат проверки A записи контроллера домена в днс
+  ansible.builtin.debug:
+   msg: "{{ testing_var.stdout_lines }}"
+
+- name: Тестирование Samba AD DC  | Запрос билета Kerberos для учетной записи администратора домена
+  ansible.builtin.shell: echo '{{ admin_dc_pass }}' | kinit Administrator
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Запрос списка кэшированных билетов Kerberos
+  ansible.builtin.command: klist
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Результат запроса кэшированных билетов Kerberos
+  ansible.builtin.debug:
+   msg: "{{ testing_var.stdout_lines }}"
+  
+- name: Тестирование Samba AD DC  | Проверка функционального уровеня домена
+  ansible.builtin.command: samba-tool domain level show
+  register: testing_var
+  changed_when: testing_var.rc != 0
+
+- name: Тестирование Samba AD DC  | Результат проверки функционального уровеня домена
+  ansible.builtin.debug:
+   msg: "{{ testing_var.stdout_lines }}"

@@ -1,0 +1,18 @@
+---
+
+# твой пользователь на мастере
+am_username               : user
+# где лежит ssh key пользователя
+ssh_key_path              : "/home/{{ am_username }}/.ssh"
+# ссылка на паблик ключ твоего пользователя на мастере
+ssh_public_key            : "/home/{{ am_username }}/.ssh/id_rsa.pub"
+# закинуть твой ключ на сервер?
+need_set_authorized_key   : true
+# удалять другие ключи на удалённом сервере?
+remove_key                : true
+# сделать для пользователя судо без пароля?
+need_sudo_no_pass         : true
+# обновить пакеты?
+need_upgrade              : false
+# выставить свою таймзону
+timezone                  : Asia/Krasnoyarsk

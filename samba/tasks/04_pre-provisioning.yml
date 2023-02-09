@@ -1,0 +1,37 @@
+---
+
+- name: Подготовка к инициализации или присоединениею к домену |  Отключение сервисов smbd nmbd winbind
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    masked: true
+  loop:
+   - smbd.service
+   - nmbd.service
+   - winbind.service
+
+- name: Подготовка к инициализации или присоединениею к домену |  Отключение samba-ad-dc
+  ansible.builtin.systemd:
+    name: samba-ad-dc.service
+    enabled: false
+    state: stopped
+    masked: false
+
+- name: Подготовка к инициализации или присоединениею к домену |  Проверка наличия smb.conf 
+  ansible.builtin.stat:
+   path: "/etc/samba/smb.conf"
+  register: check_file_name
+
+- name: Подготовка к инициализации или присоединениею к домену |  Бэкап smb.conf 
+  ansible.builtin.copy:
+   remote_src: true
+   src: "/etc/samba/smb.conf"
+   dest: "/etc/samba/smb.conf.initial"
+  when: check_file_name.stat.exists
+
+- name: Подготовка к инициализации или присоединениею к домену |  Удаление smb.conf 
+  ansible.builtin.file:
+   path: "/etc/samba/smb.conf"
+   state: absent
+  when: check_file_name.stat.exists

@@ -1,0 +1,7 @@
+---
+
+new_dc_hostname : "{{ ansible_hostname }}"
+new_dc_ip       : "{{ ansible_default_ipv4.address }}"
+default_ns      : "{{ ansible_default_ipv4.gateway }}"
+default_route   : "{{ ansible_default_ipv4.gateway }}"
+ad_domain       : "{{ ansible_dns.search.0 }}"

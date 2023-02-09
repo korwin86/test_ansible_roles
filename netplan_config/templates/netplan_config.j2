@@ -1,0 +1,15 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{ ansible_default_ipv4.alias }}:
+      addresses:
+        - {{ new_dc_ip }}/24
+      nameservers:
+        search: 
+          - {{ ad_domain }}
+        addresses:
+          - {{ default_ns }}
+      routes:
+        - to: default
+          via: {{ default_route }}

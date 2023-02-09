@@ -1,0 +1,53 @@
+---
+
+- name: Настройка после инициализации или присоединения к домену | Включение samba-ad-dc
+  ansible.builtin.systemd:
+    name: samba-ad-dc.service
+    enabled: yes
+    state: started
+    masked: no
+
+- name: Настройка после инициализации или присоединения к домену | Поиск конфига netplan
+  ansible.builtin.find:
+   paths: "/etc/netplan"
+   patterns: "*.yaml"
+  register: netplan_check_config
+
+- name: Настройка после инициализации или присоединения к домену | Замена днс на самого себя в конфиге netplan
+  ansible.builtin.lineinfile:
+    path: "{{ netplan_check_config.files[0].path }}"
+    regexp: "^ *- {{ default_ns }}"
+    line: "          - {{ ansible_default_ipv4.address }}"
+
+- name: Настройка после инициализации или присоединения к домену | Netplan apply config
+  ansible.builtin.command: netplan apply
+  register: netplan_apply_var
+  changed_when: netplan_apply_var.rc != 0
+
+  
+- name: Настройка после инициализации или присоединения к домену | Замена днс на самого себя в resolv.conf
+  ansible.builtin.lineinfile:
+    path: "/etc/resolv.conf"
+    regexp: "^nameserver "
+    line: "nameserver {{ ansible_default_ipv4.address }}"
+
+- name: Настройка после инициализации или присоединения к домену | Создание обратной зоны днс
+  ansible.builtin.command: samba-tool dns zonecreate {{ ansible_hostname }} {{ revers_zone }}.in-addr.arpa -U Administrator%{{ admin_dc_pass }}
+  register: rz_result
+  changed_when: rz_result.rc != 0
+  when: need_init_ad
+
+- name: Настройка после инициализации или присоединения к домену | Результат создания обратной зоны днс
+  ansible.builtin.debug:
+   msg: "{{ rz_result.stdout_lines }}"
+  when: need_init_ad
+
+- name: Настройка после инициализации или присоединения к домену | Добавление PTR записи КД в обратную зону
+  ansible.builtin.command: samba-tool dns add  {{ ansible_hostname }} {{ revers_zone }}.in-addr.arpa {{ ansible_default_ipv4.address | regex_search('[0-9]+$')  }} PTR {{ ansible_hostname }}.{{ ad_domain }} -U Administrator%{{ admin_dc_pass }}
+  register: rz_result
+  changed_when: rz_result.rc != 0
+
+
+- name: Настройка после инициализации или присоединения к домену | Результат добавление PTR записи КД в обратную зону
+  ansible.builtin.debug:
+   msg: "{{ rz_result.stdout_lines }}"

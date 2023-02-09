@@ -1,0 +1,145 @@
+---
+
+- name: Присоединение Samba DC к существующему домену | Настройка Kerberos
+  ansible.builtin.template:
+   src: krb5.j2
+   dest: "/etc/krb5.conf"
+   backup: yes
+
+- name: Присоединение Samba DC к существующему домену | Присоединение Samba DC в неинтерактивном режиме
+  ansible.builtin.command: samba-tool domain join {{ ad_domain }} DC -U"{{ domain }}\Administrator%{{ admin_dc_pass }}" --dns-backend={{ dns_backend }} --option="dns forwarder={{ default_ns }}" --option='idmap_ldb:use rfc2307 = yes' 
+  register: ad_result
+  changed_when: ad_result.rc != 0
+
+- name: Присоединение Samba DC к существующему домену | Результат присоединения
+  ansible.builtin.debug:
+   msg: "{{ ad_result.stdout_lines }}"
+
+
+- name: Присоединение Samba DC к существующему домену | Провека создания А записи нового КД на днс сервере
+  ansible.builtin.command: host -t A {{ new_dc_hostname }}.{{ ad_domain}}.
+  register: a_result
+  changed_when: a_result.rc != 0
+
+- name: Присоединение Samba DC к существующему домену | Результат провеки создания А записи нового КД на днс сервере
+  ansible.builtin.debug:
+   msg: "{{ a_result.stdout_lines }}"
+
+- name: Присоединение Samba DC к существующему домену | Создание А записи нового Кд если её нет.
+  ansible.builtin.command: samba-tool dns add {{ pdc_emulator }} {{ ad_domain}} {{ new_dc_hostname }} A {{ ansible_default_ipv4.alias }} -UAdministrator%{{ admin_dc_pass }}
+  when: a_result.stdout.find('not found') != -1
+
+- name: Присоединение Samba DC к существующему домену | Определение записи cname objectGUID нового кд на контроллере домена с ролью pdc emulator
+  ansible.builtin.command: ldbsearch -H /var/lib/samba/private/sam.ldb '(invocationId=*)' --cross-ncs objectguid
+  register: og_check
+  delegate_to: "{{ pdc_emulator }}"
+  changed_when: og_check.rc != 0
+  
+- name: Присоединение Samba DC к существующему домену | Результат определения записи cname objectGUID нового кд
+  ansible.builtin.debug:
+    msg: "{{ og_check.stdout_lines }}"
+
+- name: Присоединение Samba DC к существующему домену | Генерация шаблона для поиска objectGUID
+  set_fact:
+   pattern: "{{ ansible_hostname }}.+? ((\\w+-){4}\\w+)"
+
+- name: Присоединение Samba DC к существующему домену | Поиск objectGUID нового кд
+  ansible.builtin.set_fact:
+    obj_guid: "{{ og_check.stdout_lines | regex_search( pattern, '\\1', multiline = true, ignorecase = true) | first }}"
+
+- name: Присоединение Samba DC к существующему домену | Проверка записи CNAME objectGUID для нового кд
+  ansible.builtin.command: host -t CNAME {{ obj_guid }}._msdcs.{{ ad_domain }}.
+  register: test_cname
+  changed_when: test_cname.rc != 0
+
+- name: Присоединение Samba DC к существующему домену | Результат провеки записи cname objectGUID нового кд
+  ansible.builtin.debug:
+    msg: "{{ test_cname.stdout_lines }}"
+
+- name: Присоединение Samba DC к существующему домену | Добавление записи cname objectGUID нового кд, если не найдено
+  ansible.builtin.command: samba-tool dns add {{ pdc_emulator }} _msdcs.{{ ad_domain}} {{ obj_guid  }} CNAME {{new_dc_hostname}}.{{ ad_domain}} -UAdministrator%{{ admin_dc_pass }}
+  when: test_cname.stdout.find('not found') != -1
+
+- name: Присоединение Samba DC к существующему домену | Создание горячего бэкапа idmap.ldb на кд с ролью pdc_emulator
+  ansible.builtin.command: tdbbackup -s .bak /var/lib/samba/private/idmap.ldb
+  register: idmap_backup_result
+  delegate_to: "{{ pdc_emulator }}"
+  changed_when: idmap_backup_result.rc != 0
+
+
+- name: Присоединение Samba DC к существующему домену | Перенос файла idmap.ldb.bak с {{ pdc_emulator }} на мастер
+  ansible.builtin.fetch:
+    src: /var/lib/samba/private/idmap.ldb.bak
+    dest: /tmp
+  delegate_to: "{{ pdc_emulator }}"
+    
+- name: Присоединение Samba DC к существующему домену | Перенос файла idmap.ldb.bak с мастера на новый кд
+  ansible.builtin.copy:
+    src: /tmp/{{ ansible_hostname }}/var/lib/samba/private/idmap.ldb.bak
+    dest: /var/lib/samba/private/idmap.ldb
+
+- name: Присоединение Samba DC к существующему домену | Сброс кэша
+  ansible.builtin.command: net cache flush
+  register: net_cashe_flush
+  changed_when: net_cashe_flush.rc != 0
+
+
+- name: Присоединение Samba DC к существующему домену | Создание конфига rsyncd на {{ pdc_emulator }}
+  ansible.builtin.template:
+   src: rsyncd.j2
+   dest: /etc/rsyncd.conf
+   mode: 0644
+  delegate_to:  "{{ pdc_emulator }}"
+
+- name: Присоединение Samba DC к существующему домену | Включение rsync на {{ pdc_emulator }}
+  ansible.builtin.systemd:
+    name: rsync.service
+    enabled: true
+    state: started
+    masked: false
+  delegate_to:  "{{ pdc_emulator }}"
+
+- name: Присоединение Samba DC к существующему домену | Создание директории для пароля rsync
+  ansible.builtin.file:
+   path: /var/lib/samba/etc/
+   state: directory
+   mode: '0640'
+  delegate_to: "{{ item  }}"
+  loop:
+   - "{{ pdc_emulator }}"
+   - "{{ ansible_hostname }}"
+
+- name: Присоединение Samba DC к существующему домену | Создание файла с паролем для rsync на {{ pdc_emulator }}
+  ansible.builtin.copy:
+    dest: "/var/lib/samba/etc/rsyncd.secret"
+    content: "sysvol-replication:{{ rsync_replication_pass }}\n"
+    mode: 0640
+  delegate_to: "{{ pdc_emulator }}"
+
+- name: Присоединение Samba DC к существующему домену | Создание файла с паролем для rsync на новом кд
+  ansible.builtin.copy:
+    dest: "/var/lib/samba/etc/rsync-sysvol.secret"
+    content: "{{ rsync_replication_pass }}\n"
+    mode: 0640
+
+- name: Присоединение Samba DC к существующему домену | Синхронизация папки SysVol c {{ pdc_emulator }} на новый кд
+  ansible.builtin.command: rsync -XAavz --delete-after --password-file=/var/lib/samba/etc/rsync-sysvol.secret rsync://sysvol-replication@{{ pdc_emulator }}/SysVol/ /var/lib/samba/sysvol/
+  register: rsync_result
+  changed_when: rsync_result.rc != 0
+
+- name: Присоединение Samba DC к существующему домену | Результат синхронизации папки SysVol
+  ansible.builtin.debug:
+    msg: "{{ rsync_result.stdout_lines }}"
+
+- name: Присоединение Samba DC к существующему домену | Сброс ACL Sysvol на новом контроллере домена
+  ansible.builtin.command: samba-tool ntacl sysvolreset
+  register: ntacl_reset
+  changed_when: ntacl_reset.rc != 0
+
+- name: Присоединение Samba DC к существующему домену | Добавление синхронизации папки SysVol в крон каждые 5 минут
+  ansible.builtin.cron:
+    name: "sysvol synchronisation"
+    minute: "5"
+    job: "rsync -XAavz --delete-after --password-file=/var/lib/samba/etc/rsync-sysvol.secret rsync://sysvol-replication@{{ pdc_emulator }}/SysVol/ /var/lib/samba/sysvol/"
+    cron_file: sysvol_synchronisation
+    user: "{{ ansible_user }}"

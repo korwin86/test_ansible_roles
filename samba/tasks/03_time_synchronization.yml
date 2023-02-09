@@ -1,0 +1,28 @@
+---
+
+- name: Настройка синхронизации времени | Установка разрешений сокета для ntpd на контроллере домена
+  ansible.builtin.file:
+    path: /var/lib/samba/ntp_signd
+    state: directory
+    mode: 0750
+    owner: root
+    group: ntp
+
+- name: Настройка синхронизации времени | Копирование конфига ntpd
+  ansible.builtin.template:
+   src: ntpd_dc.j2
+   dest: "/etc/ntpd.conf"
+   mode: 0644
+   backup: yes
+
+- name: Настройка синхронизации времени | Настройка ntp для виртуальных машин
+  block:
+    - name: Настройка синхронизации времени | Прочитать ntp.conf
+      ansible.builtin.command: cat /etc/ntp.conf
+      register: check_ntp
+      changed_when: check_ntp.rc != 0
+
+    - name: Настройка синхронизации времени | Добавляем tinker panic 0 в ntp.conf если его нет.
+      ansible.builtin.shell: echo 'tinker panic 0' >> /etc/ntp.conf
+      when: check_ntp.stdout.find('tinker panic 0') == -1 and check_ntp.rc == 0   
+  when: on_vm

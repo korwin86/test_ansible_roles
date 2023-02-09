@@ -1,0 +1,6 @@
+---
+
+- name: Netplan apply config
+  shell: netplan apply
+  async: 1
+  poll: 0

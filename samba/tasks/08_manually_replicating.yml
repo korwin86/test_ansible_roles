@@ -1,0 +1,86 @@
+---
+
+- name: Настройка после присоединения к домену | Проверка включения порта 389(LDAP) в течении минуты для репликации
+  ansible.builtin.wait_for:
+    port: 389
+    delay: 5
+    timeout: 60
+    msg: "Порт 389 не доступен"
+  register: port_check
+  ignore_errors: true
+
+- name: Настройка после присоединения к домену | Ручная репликация разделов каталога
+  ansible.builtin.command: samba-tool drs replicate  {{ item }} {{ domain_for_rep }}  --full-sync
+  register: force_rep_st
+  changed_when: force_rep_st.rc != 0
+  when: port_check.failed == false
+  loop:
+   - "{{ ansible_hostname }} {{ pdc_emulator }}"
+   - "{{ pdc_emulator }} {{ ansible_hostname }}"
+
+
+- name: Настройка после присоединения к домену | Результат ручной репликации разделов каталога
+  ansible.builtin.debug:
+   msg: 
+    - "{{ force_rep_st.results.0.stdout_lines }}"
+    - "{{ force_rep_st.results.1.stdout_lines }}"
+
+- name: Настройка после присоединения к домену | Ручная репликация разделов каталога
+  ansible.builtin.command: samba-tool drs replicate  {{ item }} DC=ForestDnsZones,{{ domain_for_rep }}  --full-sync
+  register: force_rep_st
+  changed_when: force_rep_st.rc != 0
+  when: port_check.failed == false
+  loop:
+   - "{{ ansible_hostname }} {{ pdc_emulator }}"
+   - "{{ pdc_emulator }} {{ ansible_hostname }}"
+
+- name: Настройка после присоединения к домену | Результат ручной репликации разделов каталога
+  ansible.builtin.debug:
+   msg: 
+    - "{{ force_rep_st.results.0.stdout_lines }}"
+    - "{{ force_rep_st.results.1.stdout_lines }}"
+
+- name: Настройка после присоединения к домену | Ручная репликация разделов каталога
+  ansible.builtin.command: samba-tool drs replicate  {{ item }} CN=Configuration,{{ domain_for_rep }}  --full-sync
+  register: force_rep_st
+  changed_when: force_rep_st.rc != 0
+  when: port_check.failed == false
+  loop:
+   - "{{ ansible_hostname }} {{ pdc_emulator }}"
+   - "{{ pdc_emulator }} {{ ansible_hostname }}"
+
+- name: Настройка после присоединения к домену | Результат ручной репликации разделов каталога
+  ansible.builtin.debug:
+   msg: 
+    - "{{ force_rep_st.results.0.stdout_lines }}"
+    - "{{ force_rep_st.results.1.stdout_lines }}"
+
+- name: Настройка после присоединения к домену | Ручная репликация разделов каталога
+  ansible.builtin.command: samba-tool drs replicate  {{ item }} DC=DomainDnsZones,{{ domain_for_rep }}  --full-sync
+  register: force_rep_st
+  changed_when: force_rep_st.rc != 0
+  when: port_check.failed == false
+  loop:
+   - "{{ ansible_hostname }} {{ pdc_emulator }}"
+   - "{{ pdc_emulator }} {{ ansible_hostname }}"
+
+- name: Настройка после присоединения к домену | Результат ручной репликации разделов каталога
+  ansible.builtin.debug:
+   msg: 
+    - "{{ force_rep_st.results.0.stdout_lines }}"
+    - "{{ force_rep_st.results.1.stdout_lines }}"
+
+- name: Настройка после присоединения к домену | Ручная репликация разделов каталога
+  ansible.builtin.command: samba-tool drs replicate  {{ item }} CN=Schema,CN=Configuration,{{ domain_for_rep }}  --full-sync
+  register: force_rep_st
+  changed_when: force_rep_st.rc != 0
+  when: port_check.failed == false
+  loop:
+   - "{{ ansible_hostname }} {{ pdc_emulator }}"
+   - "{{ pdc_emulator }} {{ ansible_hostname }}"
+
+- name: Настройка после присоединения к домену | Результат ручной репликации разделов каталога
+  ansible.builtin.debug:
+   msg: 
+    - "{{ force_rep_st.results.0.stdout_lines }}"
+    - "{{ force_rep_st.results.1.stdout_lines }}"

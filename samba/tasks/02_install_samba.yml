@@ -1,0 +1,30 @@
+---
+
+- name: Установка Samba | Основные пакеты
+  ansible.builtin.apt:
+   name:
+    - acl
+    - attr
+    - samba
+    - samba-dsdb-modules
+    - samba-vfs-modules
+    - winbind
+    - libpam-winbind
+    - libnss-winbind
+    - libpam-krb5
+    - krb5-config
+    - krb5-user
+    - ntp
+   state: latest
+   update_cache: true
+
+- name: Установка Samba | Дополнительные пакеты для контроллеров домена
+  ansible.builtin.apt:
+   name:
+    - dnsutils
+    - ldb-tools
+    - rsync
+    - smbclient
+   state: latest
+   update_cache: true
+  when: need_init_ad or need_join_domain

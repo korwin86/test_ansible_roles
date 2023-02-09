@@ -1,0 +1,45 @@
+---
+
+- name: Подготовка к установке
+  ansible.builtin.import_tasks: 01_preparing_the_installation.yml
+  when: need_preparing or need_join_domain
+
+- name: Установка Samba
+  ansible.builtin.import_tasks: 02_install_samba.yml
+  when: need_install
+
+- name: Настройка синхронизации времени
+  ansible.builtin.import_tasks: 03_time_synchronization.yml
+  when: neet_set_time
+
+- name: Подготовка к инициализации или присоединениею к домену
+  ansible.builtin.import_tasks: 04_pre-provisioning.yml
+  when: need_preparing or need_join_domain
+
+- name: Cоздание домена
+  ansible.builtin.import_tasks: 05_provisioning_samba_ad.yml
+  when: need_init_ad and need_join_domain == false
+
+- name: Присоединение к домену
+  ansible.builtin.import_tasks: 06_joining_samba_dc_to_ad.yml
+  when: need_join_domain and need_init_ad == false
+
+- name: Настройка после инициализации или присоединения к домену
+  ansible.builtin.import_tasks: 07_post-provisioning.yml
+  when: need_init_ad or need_join_domain
+
+- name: Ручная репликация разделов каталога
+  ansible.builtin.import_tasks: 08_manually_replicating.yml
+  when: need_replication or need_join_domain
+
+- name: Тестирование после присоединения к домену
+  ansible.builtin.import_tasks: 09_testing_joining_samba_ad.yml
+  when: need_testing and need_join_domain or need_testing_after_join
+
+- name: Тестирование домена
+  ansible.builtin.import_tasks: 10_testing_samba_ad.yml
+  when: need_testing
+ 
+- name: Настройка групповых политик паролей
+  ansible.builtin.import_tasks: 11_setting password policies.yml
+  when: need_pass_set

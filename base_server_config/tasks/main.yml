@@ -1,0 +1,53 @@
+---
+
+- name: поиск ssh public key на мастере
+  ansible.builtin.find:
+   paths: "{{ ssh_key_path }}"
+   patterns: "id_rsa.pub"
+  register: check_ssh_public_key
+  delegate_to: localhost
+
+- name: если ключа нет, то сгененрировать ключ с дефолтными параметрами(4096 bits, rsa)
+  community.crypto.openssh_keypair:
+   path: "{{ ssh_key_path }}/id_rsa"
+   owner: "{{ am_username }}"
+   group: "{{ am_username }}"
+   comment: "{{ am_username }}@{{ ansible_nodename }}"
+  when: check_ssh_public_key.matched == 0
+  delegate_to: localhost
+
+- name: проверка наличия {{ am_username }} на сервере
+  ansible.builtin.user:
+   name: "{{ am_username }}"
+   password: "$6$mysecretsalt$p/lI6jR.PoVZXt6R0usIJ/.xJtaStPMto6DethZQwYK.bwL/4F1GfCCR0cx71diCP8K.dq3MdBU6itE2wxBoT."
+   groups: "sudo"
+   state: present
+   shell: /bin/bash
+
+- name: установить ssh ключ {{ am_username }}
+  ansible.posix.authorized_key:
+   user: "{{ am_username }}"
+   key: "{{ lookup('file', ssh_public_key) }}"
+   state: present
+   exclusive: "{{ remove_key }}"
+  when: need_set_authorized_key
+
+- name: sudo без пароля для {{ am_username }}
+  community.general.sudoers:
+   name: allow-nopass
+   state: present
+   user: "{{ am_username }}"
+   commands: ALL
+   nopassword: yes
+  when: need_sudo_no_pass
+
+- name: APT Upgrade
+  apt:
+   upgrade: yes
+   update_cache: yes
+  when: need_upgrade
+
+- name: Set timezone
+  community.general.timezone:
+   hwclock: local 
+   name: "{{ timezone }}"
